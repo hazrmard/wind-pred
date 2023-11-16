@@ -1,0 +1,5 @@
+*.hdf5
+*.pickle
+*.csv
+*.pyc
+.venv/
