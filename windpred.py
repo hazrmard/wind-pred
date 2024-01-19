@@ -9,69 +9,25 @@ from typing import Tuple
 from tqdm.autonotebook import trange
 import statsmodels.api as sm
 
+from data import read_file, find_sequences
+
 
 INTERVAL = pd.Timedelta(minutes=15)
 
 
-def read_file(dir_path='./', processed=False) -> pd.DataFrame:
-    if os.path.exists(dir_path+'ERDCSlow.hdf5') and processed:
-        df = pd.read_hdf(dir_path+'ERDCSlow.hdf5', key='table', index_col='Time')
-    else:
-        df = pd.read_csv(dir_path + 'ERDCSlow.csv',
-                        index_col='Time', parse_dates=['Time'])
-        cols = []
-        for col in df.columns:
-            c = pd.to_numeric(df[col], errors='coerce', downcast='float')
-            cols.append(c)
-        df = pd.concat(cols, axis=1)
-
-        df = df[['Speed', 'Direction', 'Temp']]
-        df = df.dropna(axis=0, how='any')
-        df.to_hdf(dir_path + '/ERDCSlow.hdf5', key='table')
-    df['dx'] = np.cos(df.Direction)
-    df['dy'] = np.sin(df.Direction)
-    return df
-
-
-
-def find_sequences(df, interval=pd.Timedelta(minutes=1), agg_fn='mean'):
-    resampler = df.resample(interval)
-    if agg_fn=='mean':
-        dfm = resampler.mean()
-    elif agg_fn=='max':
-        dfm = resampler.max()
-    elif isinstance(agg_fn, float):
-        dfm = resampler.quantile(agg_fn)
-    i, ii = 0, dfm.index[0]
-    j, jj = 1, dfm.index[1]
-    seqs = []
-    while j < len(dfm):
-        while i < len(dfm):
-            if not np.isnan(dfm.Speed.iloc[i]):
-                break
-            i += 1
-        j = i+1
-        while j <= len(dfm):
-            if j==len(dfm) or np.isnan(dfm.Speed.iloc[j]):
-                seqs.append(dfm.iloc[i:j])
-                i = j+1
-                break
-            j += 1
-
-    for s in seqs:
-        s.index.freq = interval
-
-    return [s for s in seqs if len(s)>=4]
-
-
-
 def pretrain(model_class, data: pd.DataFrame, exog=None, **kwargs) -> ARIMA:
+    """
+    Fit a model to the data
+    """
     model = model_class(data, exog=exog, **kwargs)
     return model.fit()
 
 
 
-def update(result: ARIMAResults, data: pd.DataFrame, exog, interval, append=True):
+def update(result: ARIMAResults, data: pd.DataFrame, exog, interval, append=False):
+    """
+    Update the model with new data. By default, the model does not keep the old data.
+    """
     if data.index[-1] - result.data.dates[-1] > interval:
         model = result.model.clone(data, exog=exog)
         result = model.fit(start_params=result.params)
@@ -162,15 +118,6 @@ def train_model(interval, order, df, endog_col, exog_cols, seq_kwargs={}):
         exog = exog_cols if exog_cols is None else dft[exog_cols]
         res = update(res, endog, exog=exog, interval=interval)
     return res
-
-
-def save_arma_model(res, path):
-    pass
-
-
-
-def load_arma_model(path) -> ARIMA:
-    pass
 
 
 def save_combined_model(models, path='arma_model.pickle'):
