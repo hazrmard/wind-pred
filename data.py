@@ -7,7 +7,7 @@ from scipy.stats import wasserstein_distance
 from scipy.special import kl_div
 
 
-def read_erdc_file(dir_path='./', processed=False) -> pd.DataFrame:
+def read_erdc_file(dir_path='./', processed=True) -> pd.DataFrame:
     """
     Read wind data from a file and return a pandas DataFrame.
 

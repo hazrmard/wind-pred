@@ -141,7 +141,17 @@ def combined_predict(df, res=Tuple[ARIMAResults, ARIMAResults, ARIMAResults], in
     arma_dy, pred_dy = predict(arma_dy, df.dy, None, interval=interval)
     pred = pd.concat((pred_speed, pred_dx, pred_dy), axis=1)
     pred.columns = ['Speed', 'dx', 'dy']
-    return(arma_speed, arma_dx, arma_dy), pred
+    return (arma_speed, arma_dx, arma_dy), pred
+
+
+def combined_simulate(n, df, res=Tuple[ARIMAResults, ARIMAResults, ARIMAResults]):
+    arma_speed, arma_dx, arma_dy = res
+    sim_speed = arma_speed.apply(df.Speed).simulate(n)
+    sim_dx = arma_dx.apply(df.dx).simulate(n)
+    sim_dy = arma_dy.apply(df.dy).simulate(n)
+    pred = pd.concat((sim_speed, sim_dx, sim_dy), axis=1)
+    pred.columns = ['Speed', 'dx', 'dy']
+    return res, pred
 
 
 
