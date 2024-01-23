@@ -36,7 +36,7 @@ This will load a validation dataset and output the RMSE measure for Speed and di
 ### Running the model
 
 ```python
-from windpred import load_combined_model, combined_predict, INTERVAL
+from windpred import load_combined_model, combined_predict, combined_simulate, INTERVAL
 
 # Create a dataframe containing past measurement(s)
 # make sure frequency of input data is the same as INTERVAL,
@@ -49,8 +49,8 @@ dft = pd.DataFrame(
     )
 
 # Or, you can load the ERDC data and create dataframes of contiguous sequences:
-from windpred import load_erdc_data, find_sequences
-alldata = load_erdc_data()
+from data import read_erdc_file, find_sequences
+alldata = read_erdc_file()
 seqs = find_sequences(alldata, interval=pd.Timedelta(minutes=15))
 # seqs is a list of dataframes like `dft` above
 dft = seqs[0] # or any index in seqs
