@@ -4,12 +4,11 @@ import os
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.arima.model import ARIMAResults, ARIMA
-from statsmodels.tsa.statespace.varmax import VARMAX, VARMAXResults
-from typing import Tuple
-from tqdm.autonotebook import trange
+from typing import Tuple, List
+from tqdm.autonotebook import trange, tqdm
 import statsmodels.api as sm
 
-from data import read_file, find_sequences
+from data import read_erdc_file, find_sequences
 
 
 INTERVAL = pd.Timedelta(minutes=15)
@@ -28,7 +27,7 @@ def update(result: ARIMAResults, data: pd.DataFrame, exog, interval, append=Fals
     """
     Update the model with new data. By default, the model does not keep the old data.
     """
-    if data.index[-1] - result.data.dates[-1] > interval:
+    if (data.index[-1] - result.data.dates[-1]) > interval:
         model = result.model.clone(data, exog=exog)
         result = model.fit(start_params=result.params)
     else:
@@ -41,7 +40,7 @@ def update(result: ARIMAResults, data: pd.DataFrame, exog, interval, append=Fals
 
 
 def predict(result: ARIMAResults, data: pd.DataFrame, exog, interval, in_sample=True) -> Tuple[ARIMAResults, float]:
-    if data.index[0] - result.data.dates[-1] > interval:
+    if data.index[0] - result.data.dates[-1] > interval or result.data.endog is None:
        result = result.apply(data, exog=exog)
     else:
         result = result.append(data, exog=exog)
@@ -108,29 +107,31 @@ def trial(
 
 
 
-def train_model(interval, order, df, endog_col, exog_cols, seq_kwargs={}):
+def train_model(interval, order, df, endog_col, exog_cols, seq_kwargs={}) -> ARIMAResults:
     seqs = find_sequences(df, interval, **seq_kwargs)
     endog = seqs[0][endog_col]
     exog = exog_cols if exog_cols is None else seqs[0][exog_cols]
     res = pretrain(sm.tsa.ARIMA, endog, exog=exog, order=order)
-    for dft in seqs[1:]:
+    for dft in tqdm(seqs[1:], leave=False, desc='training'):
         endog = dft[endog_col]
         exog = exog_cols if exog_cols is None else dft[exog_cols]
         res = update(res, endog, exog=exog, interval=interval)
     return res
 
 
-def save_combined_model(models, path='arma_model.pickle'):
-    import pickle
-    with open(path, 'wb') as f:
-        pickle.dump(models, f)
+def save_combined_model(models, basename='bin/arma_model'):
+    for i, m in enumerate(models):
+        m.save(f'{basename}_{i}.pkl', remove_data=True)
 
 
-def load_combined_model(path='arma_model.pickle'):
-    import pickle
-    with open(path, 'rb') as f:
-        return pickle.load(f)
-
+def load_combined_model(basename='bin/arma_model') -> List[ARIMAResults]:
+    from glob import glob
+    files = glob(f'{basename}_*.pkl')
+    files.sort()
+    models = []
+    for f in files:
+        models.append(ARIMAResults.load(f))
+    return models
 
 
 def combined_predict(df, res=Tuple[ARIMAResults, ARIMAResults, ARIMAResults], interval=INTERVAL):
@@ -146,7 +147,7 @@ def combined_predict(df, res=Tuple[ARIMAResults, ARIMAResults, ARIMAResults], in
 
 if __name__=='__main__':
     import sys
-    df = read_file(processed=True)
+    df = read_erdc_file(processed=True)
     dfog = df # original dataframe with all data
     # Testing data
     dft = dfog.loc['2022-06-28':'2022-07-07']
