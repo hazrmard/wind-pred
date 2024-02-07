@@ -3,8 +3,12 @@ from typing import List
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy
 from scipy.stats import wasserstein_distance
 from scipy.special import kl_div
+from scipy.stats import boxcox
+from scipy.special import inv_boxcox
+import statsmodels.api as sm
 
 
 def read_erdc_file(dir_path='./', processed=True) -> pd.DataFrame:
@@ -102,8 +106,24 @@ def probabilistic_distance(a: np.ndarray, b: np.ndarray, measure='wasserstein'):
     """
     if measure=='wasserstein':
         return wasserstein_distance(a, b)
+    elif measure=='jensenshannon':
+        # Compute the histograms of the arrays (probability densities)
+        hist_a, bins_a = np.histogram(a, bins='auto', density=True)
+        hist_b, bins_b = np.histogram(b, bins=bins_a, density=True)
+        return scipy.spatial.distance.jensenshannon(hist_a, hist_b)
     elif measure=='kl':
         # Compute the histograms of the arrays (probability densities)
         hist_a, bins_a = np.histogram(a, bins='auto', density=True)
         hist_b, bins_b = np.histogram(b, bins=bins_a, density=True)
-        return kl_div(hist_a, hist_b).sum()   
+        return kl_div(hist_a, hist_b).sum()  
+
+
+def synthesize_data(seq: pd.Series, size=24*15*365):
+    b, lmbda = boxcox(seq)
+    b = pd.Series(b, index=seq.index)
+    model = sm.tsa.ARIMA(b, order=(1,0,20))
+    result = model.fit()
+    sim = result.simulate(size)
+    sim_inv = inv_boxcox(sim, lmbda)
+    pred_inv = pd.Series(sim_inv, index=sim.index)
+    return sim_inv
