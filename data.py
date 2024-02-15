@@ -127,3 +127,12 @@ def synthesize_data(seq: pd.Series, size=24*15*365):
     sim_inv = inv_boxcox(sim, lmbda)
     pred_inv = pd.Series(sim_inv, index=sim.index)
     return sim_inv
+
+
+def evaluate(pred: np.ndarray, actual: np.ndarray, name:str):
+    df = pd.DataFrame(columns=['RMSE', 'JS', 'Wasserstein'])
+    rmse = np.sqrt(np.mean((np.asarray(pred)-np.asarray(actual))**2))
+    js = probabilistic_distance(pred, actual, measure='jensenshannon')
+    ws = probabilistic_distance(pred, actual, measure='wasserstein')
+    df.loc[name] = [rmse, js, ws]
+    return df

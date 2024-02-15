@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.arima.model import ARIMAResults, ARIMA
-from typing import Tuple, List
+from typing import Tuple, List, Iterable, Union
 from tqdm.autonotebook import trange, tqdm
 import statsmodels.api as sm
 
@@ -22,21 +22,31 @@ def pretrain(model_class, data: pd.DataFrame, exog=None, **kwargs) -> ARIMA:
     return model.fit()
 
 
-
-def update(result: ARIMAResults, data: pd.DataFrame, exog, interval, append=False):
+def update(
+        result: Union[ARIMAResults,ARIMA],
+        data: Union[pd.DataFrame, Iterable[pd.DataFrame]],
+        exog,
+        interval,
+        append=False,
+        model_kwargs={}
+    ) -> ARIMAResults:
     """
     Update the model with new data. By default, the model does not keep the old data.
     """
-    if (data.index[-1] - result.data.dates[-1]) > interval:
-        model = result.model.clone(data, exog=exog)
-        result = model.fit(start_params=result.params)
-    else:
-        if append:
-            result = result.append(data, exog=exog, refit=True)
+    if isinstance(data, pd.DataFrame):
+        data = [data]
+    if result.__name__=='ARIMA' and isinstance(result, type):
+        result = pretrain(result, data[0], exog=exog, **model_kwargs)
+    for d in data[1:]:
+        if (d.index[-1] - result.data.dates[-1]) > interval:
+            result = result.apply(d, exog=exog, refit=True, copy_initialization=True)
         else:
-            result = result.extend
+            if append:
+                result = result.append(d, exog=exog, refit=True)
+            else:
+                result = result.extend(d, exog=exog, refit=True)
     return result
-
+train = update
 
 
 def predict(result: ARIMAResults, data: pd.DataFrame, exog, interval, in_sample=True) -> Tuple[ARIMAResults, float]:
@@ -179,7 +189,7 @@ if __name__=='__main__':
 
         rmse_speed = sm.tools.eval_measures.rmse(pred.Speed, seqs[0].Speed)
         rmse_dx = sm.tools.eval_measures.rmse(pred.dx, seqs[0].dx)
-        rmse_dy = sm.tools.eval_measures.rmse(pred.dx, seqs[0].dy)
+        rmse_dy = sm.tools.eval_measures.rmse(pred.dy, seqs[0].dy)
         print(f'rmse_speed (m/s)={rmse_speed:.2f}')
         print(f'rmse_dx (cos(direction))={rmse_dx:.2f}')
         print(f'rmse_dy (sin(direction))={rmse_dy:.2f}')
