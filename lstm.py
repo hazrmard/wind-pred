@@ -6,6 +6,11 @@ from tqdm.autonotebook import trange, tqdm
 
 
 class Model(nn.Module):
+    """A LSTM with an initial and final fully-connected layer.
+    Takes inputs and predicts outputs as 3D arrays in the form:
+
+        [time, instance, feature]
+    """
 
     def __init__(self, in_features, out_features, hidden_size=10, num_layers=2):
         super().__init__()
