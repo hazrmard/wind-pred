@@ -36,7 +36,7 @@ This will load a validation dataset and output the RMSE measure for Speed and di
 ### Running the arma model
 
 ```python
-from lstm import load_combined_model, combined_predict, combined_simulate, INTERVAL
+from arma import load_combined_model, combined_predict, combined_simulate, INTERVAL
 
 # Create a dataframe containing past measurement(s)
 # make sure frequency of input data is the same as INTERVAL,
