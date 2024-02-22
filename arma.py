@@ -35,16 +35,17 @@ def update(
     """
     if isinstance(data, pd.DataFrame):
         data = [data]
+        exog = [exog]
     if result.__name__=='ARIMA' and isinstance(result, type):
-        result = pretrain(result, data[0], exog=exog, **model_kwargs)
-    for d in data[1:]:
+        result = pretrain(result, data[0], exog=exog[0], **model_kwargs)
+    for i, d in enumerate(data[1:]):
         if (d.index[-1] - result.data.dates[-1]) > interval:
-            result = result.apply(d, exog=exog, refit=True, copy_initialization=True)
+            result = result.apply(d, exog=exog[i+1], refit=True, copy_initialization=True)
         else:
             if append:
-                result = result.append(d, exog=exog, refit=True)
+                result = result.append(d, exog=exog[i+1], refit=True)
             else:
-                result = result.extend(d, exog=exog, refit=True)
+                result = result.extend(d, exog=exog[i+1], refit=True)
     return result
 train = update
 
@@ -60,61 +61,6 @@ def predict(result: ARIMAResults, data: pd.DataFrame, exog, interval, in_sample=
         # pred = result.forecast(steps=1)
         pred = result.predict(start=data.index[0], dynamic=0)
     return result, pred
-
-
-
-def trial(
-    interval, order, df, seq_kwargs={}, filter_fn=lambda df: df, split=0.25,
-    endog_col='Speed', exog_cols=None
-):
-    df = filter_fn(df)
-    seqs = find_sequences(df, interval, **seq_kwargs)
-    # leave one out testing
-    rmses = []
-    rmses_persistent = []
-    ntest = 0
-    splits = int(len(seqs) * split)
-
-    for i in trange(len(seqs), leave=False, desc='splits'):
-        if isinstance(split, float) and 0<split<1:
-            ntrain = int(len(seqs[i]) * (1-split))
-            dtrain = [seqs[i].iloc[:ntrain]]
-            dtest = [seqs[i].iloc[ntrain:]]
-        else:
-            if i==split:
-                break
-            dtest = [seqs[i]]
-            dtrain = [seqs[j] for j in range(splits) if j!=i]
-
-        endog = dtrain[0][endog_col]
-        exog = exog_cols if exog_cols is None else dtrain[0][exog_cols]
-        res = pretrain(sm.tsa.ARIMA, endog, exog=exog, order=order)
-        for dft in dtrain[1:]:
-            endog = dft[endog_col]
-            exog = exog_cols if exog_cols is None else dft[exog_cols]
-            res = update(res, endog, exog=exog, interval=interval)
-        for dft in dtest:
-            if dft.index[0] < res.data.dates[-1]:
-                dft = dft.copy()
-                dft.index += (res.data.dates[-1] - dft.index[0]) + (2 * interval)
-                dft.index.freq = interval
-            ntest += len(dft)
-            # predictions = []
-            # for k in trange(len(dft.Speed), leave=False, desc='instance'):
-            #     res, pred = predict(res, dft.Speed.iloc[k:k+1], interval)
-            #     predictions.append(pred)
-            # pred = pd.concat(predictions)
-            endog = dft[endog_col]
-            exog = exog_cols if exog_cols is None else dft[exog_cols]
-            res, pred = predict(res, endog, exog, interval)
-            rmses.append(sm.tools.eval_measures.rmse(pred, endog) * len(dft))
-            rmses_persistent.append(sm.tools.eval_measures.rmse(endog.iloc[:-1], endog.iloc[1:]) * (len(dft)-1))
-            print(f'Split {i} \tRMSE: {rmses[-1]/len(dft):.2f}')
-    return dict(
-        rmse=sum(rmses) / ntest,
-        rmse_persistent=sum(rmses_persistent) / (ntest - splits)
-    )
-
 
 
 def train_model(interval, order, df, endog_col, exog_cols, seq_kwargs={}) -> ARIMAResults:

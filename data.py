@@ -43,7 +43,7 @@ def read_erdc_file(dir_path='./', processed=True) -> pd.DataFrame:
 
 
 
-def find_sequences(df, interval=pd.Timedelta(minutes=1), agg_fn='mean'):
+def find_sequences(df, interval=pd.Timedelta(minutes=1), agg_fn='mean', col='Speed'):
     """
     Find sequences of non-null values in the given DataFrame.
 
@@ -67,12 +67,12 @@ def find_sequences(df, interval=pd.Timedelta(minutes=1), agg_fn='mean'):
     seqs = []
     while j < len(dfm):
         while i < len(dfm):
-            if not np.isnan(dfm.Speed.iloc[i]):
+            if not np.isnan(dfm[col].iloc[i]):
                 break
             i += 1
         j = i+1
         while j <= len(dfm):
-            if j==len(dfm) or np.isnan(dfm.Speed.iloc[j]):
+            if j==len(dfm) or np.isnan(dfm[col].iloc[j]):
                 seqs.append(dfm.iloc[i:j])
                 i = j+1
                 break
