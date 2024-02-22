@@ -33,10 +33,10 @@ python windpred.py test
 
 This will load a validation dataset and output the RMSE measure for Speed and direction (dx, dy components).
 
-### Running the model
+### Running the arma model
 
 ```python
-from windpred import load_combined_model, combined_predict, combined_simulate, INTERVAL
+from lstm import load_combined_model, combined_predict, combined_simulate, INTERVAL
 
 # Create a dataframe containing past measurement(s)
 # make sure frequency of input data is the same as INTERVAL,
@@ -65,4 +65,28 @@ res, pred = combined_predict(new_dft, res)
 
 # Simulate new timeseries of length 1000, where `simulation` is a dataframe like `dft`
 res, simulation = combined_simulate(1000, dft, res)
+```
+
+### running the lstm model
+
+
+```python
+import torch
+from lstm import Model
+
+m = Model(3, 3, hidden_size=32, num_layers=4)
+m.load_state_dict(torch.load('./bin/model_lstm.pt'))
+
+# Speed is magnitude, dx=cos(heading), dy=sin(heading)
+data = pd.DataFrame({'Speed':[10,11], 'dx': [0.45, 0.4], 'dy': [0.1, 0.3]})
+
+# return a prediction at each timestep in the dataframe. The next prediction
+# is the last row in `pred`.
+pred = m.predict(data.values)
+
+final_pred = pred[-1]
+pred_s, pred_dx, pred_dy = final_pred
+
+# convert dx/dy into heading (degrees)
+print('Speed', pred_s, 'Direction', np.arctan2(pred_dy, pred_dx) * 180/np.pi)
 ```
